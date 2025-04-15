@@ -1,3 +1,4 @@
+import 'package:audara/screens/search.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -149,6 +150,21 @@ class Home extends StatelessWidget {
             backgroundColor: Colors.black,
             selectedItemColor: Colors.green,
             unselectedItemColor: Colors.white70,
+            currentIndex: 0, // Set the current index to highlight the Home tab
+            onTap: (index) {
+              if (index == 1) { // Index 1 corresponds to the Search tab
+                Navigator.pushReplacement(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                        SearchScreen(),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                  ),
+                );
+              }
+            },
             items: const [
               BottomNavigationBarItem(
                 icon: Icon(Icons.home),
