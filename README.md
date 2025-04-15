@@ -2,15 +2,9 @@
 
 Audara lets you search, stream, or download music using Lidarr—like Spotify, but with auto-downloads for missing tracks.
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Features
+- Search for music
+- Stream music
+- Download music
+- AES-256 encryption for all data (except for the initial session-key that the server sends to the client)
+- Auto-download missing tracks
