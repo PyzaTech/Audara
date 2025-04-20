@@ -1,6 +1,13 @@
+import 'dart:convert';
 import 'package:audara/screens/search.dart';
+import 'package:audara/widgets/MediaPlayer.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../utils/PlayQueue.dart';
+import '../utils/WebSocketHandler.dart';
 
 class Home extends StatelessWidget {
   const Home({super.key});
@@ -8,6 +15,23 @@ class Home extends StatelessWidget {
   Future<String> _getUsername() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.getString('username') ?? 'User';
+  }
+
+  Future<List<Map<String, String>>> _fetchRandomPicks() async {
+    final response = await http.get(Uri.parse("https://api.deezer.com/chart"));
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return (data['tracks']['data'] as List).map((item) {
+        return {
+          'title': item['title'] as String? ?? 'Unknown Title',
+          'artist': item['artist']['name'] as String? ?? 'Unknown Artist',
+          'image': item['album']['cover_small'] as String? ?? '',
+        };
+      }).toList();
+    } else {
+      return [];
+    }
   }
 
   @override
@@ -73,7 +97,6 @@ class Home extends StatelessWidget {
                         fontSize: 18,
                         fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 16),
                   SizedBox(
                     height: 120,
                     child: ListView.builder(
@@ -105,78 +128,115 @@ class Home extends StatelessWidget {
                       },
                     ),
                   ),
+
                   const SizedBox(height: 24),
                   const Text(
-                    'Recommended for You',
+                    'Random Picks',
                     style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: 10,
-                    itemBuilder: (context, index) {
-                      return ListTile(
-                        leading: Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[900],
-                            borderRadius: BorderRadius.circular(8),
+                  FutureBuilder<List<Map<String, String>>>(
+                    future: _fetchRandomPicks(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+
+                      if (snapshot.hasError || snapshot.data == null || snapshot.data!.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'No random picks available',
+                            style: TextStyle(color: Colors.white70),
                           ),
-                          child: const Icon(Icons.album, color: Colors.white),
-                        ),
-                        title: const Text(
-                          'Song Title',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        subtitle: const Text(
-                          'Artist Name',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        trailing:
-                        const Icon(Icons.more_vert, color: Colors.white),
+                        );
+                      }
+
+                      final randomPicks = snapshot.data!;
+
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: randomPicks.length,
+                        itemBuilder: (context, index) {
+                          final song = randomPicks[index];
+                          return ListTile(
+                            leading: song['image']!.isNotEmpty
+                                ? Image.network(
+                              song['image']!,
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                            )
+                                : const Icon(Icons.music_note, color: Colors.white70),
+                            title: Text(
+                              song['title']!,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            subtitle: Text(
+                              song['artist']!,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            trailing: const Icon(Icons.more_vert, color: Colors.white),
+                            onTap: () {
+                              final playQueue = Provider.of<PlayQueue>(context, listen: false);
+                              final webSocketHandler = Provider.of<WebSocketHandler>(context, listen: false);
+
+                              print('🎵 Song selected: ${song['title']} by ${song['artist']}');
+                              playQueue.streamSong(webSocketHandler, song, context);
+
+                            },
+                          );
+                        },
                       );
                     },
                   ),
+
                 ],
               ),
             ),
           ),
-          bottomNavigationBar: BottomNavigationBar(
-            backgroundColor: Colors.black,
-            selectedItemColor: Colors.green,
-            unselectedItemColor: Colors.white70,
-            currentIndex: 0, // Set the current index to highlight the Home tab
-            onTap: (index) {
-              if (index == 1) { // Index 1 corresponds to the Search tab
-                Navigator.pushReplacement(
-                  context,
-                  PageRouteBuilder(
-                    pageBuilder: (context, animation, secondaryAnimation) =>
-                        SearchScreen(),
-                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(opacity: animation, child: child);
-                    },
+          bottomNavigationBar: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const MediaPlayer(), // Add the MediaPlayer widget here
+              BottomNavigationBar(
+                backgroundColor: Colors.black,
+                selectedItemColor: Colors.green,
+                unselectedItemColor: Colors.white70,
+                currentIndex: 0, // Set the current index to highlight the Home tab
+                onTap: (index) {
+                  if (index == 1) { // Index 1 corresponds to the Search tab
+                    Navigator.pushReplacement(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) =>
+                        const SearchScreen(),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          return FadeTransition(opacity: animation, child: child);
+                        },
+                      ),
+                    );
+                  }
+                },
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.home),
+                    label: 'Home',
                   ),
-                );
-              }
-            },
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.search),
-                label: 'Search',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.library_music),
-                label: 'Your Library',
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.search),
+                    label: 'Search',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.library_music),
+                    label: 'Your Library',
+                  ),
+                ],
               ),
             ],
           ),

@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:encrypt/encrypt.dart' as encrypt;
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AesCrypto {
@@ -9,49 +11,31 @@ class AesCrypto {
 
   static const _keyPref = 'aes_session_key';
   encrypt.Key? _key;
-
-  bool get isReady => _key != null;
+  encrypt.Key? get key => _key;
 
   void initFromBase64(String base64Key) {
     _key = encrypt.Key(base64Decode(base64Key));
   }
 
-  // Encrypt the text with a new IV for each encryption
   String encryptText(String plainText) {
     if (_key == null) throw Exception("AES key not initialized.");
-
-    // Generate a new IV for each encryption
     final iv = encrypt.IV.fromLength(16);
-
-    // Encrypt the text
     final encrypter = encrypt.Encrypter(encrypt.AES(_key!, mode: encrypt.AESMode.cbc));
     final encrypted = encrypter.encrypt(plainText, iv: iv);
 
-    // Return a JSON-formatted string with IV and encrypted data
-    final message = jsonEncode({
-      'iv': base64Encode(iv.bytes),  // Send IV as base64-encoded
-      'data': encrypted.base64,      // Send encrypted data as base64
+    return jsonEncode({
+      'iv': base64Encode(iv.bytes),
+      'data': encrypted.base64,
     });
-
-    return message;
   }
 
   String decryptText(String encryptedText) {
     if (_key == null) throw Exception("AES key not initialized.");
-
-    // Parse the JSON string to extract 'iv' and 'data'
     final Map<String, dynamic> message = jsonDecode(encryptedText);
-    final String ivBase64 = message['iv'];
-    final String dataBase64 = message['data'];
-
-    // Decode the IV and encrypted data
-    final iv = encrypt.IV.fromBase64(ivBase64);
-
-    // Decrypt the data
+    final iv = encrypt.IV.fromBase64(message['iv']);
+    final data = message['data'];
     final encrypter = encrypt.Encrypter(encrypt.AES(_key!, mode: encrypt.AESMode.cbc));
-    final decrypted = encrypter.decrypt64(dataBase64, iv: iv);
-
-    return decrypted;
+    return encrypter.decrypt64(data, iv: iv);
   }
 
   Future<void> saveToPrefs() async {
@@ -67,4 +51,24 @@ class AesCrypto {
     initFromBase64(base64Key);
     return true;
   }
+}
+
+class DecryptionPayload {
+  final String encryptedJson;
+  final String base64Key;
+  const DecryptionPayload({required this.encryptedJson, required this.base64Key});
+}
+
+Map<String, dynamic> decryptAndParseWithAES(DecryptionPayload payload) {
+  final key = encrypt.Key(base64Decode(payload.base64Key));
+  final Map<String, dynamic> message = jsonDecode(payload.encryptedJson);
+  final iv = encrypt.IV.fromBase64(message['iv']);
+  final data = message['data'];
+  final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.cbc));
+  final decrypted = encrypter.decrypt64(data, iv: iv);
+  return jsonDecode(decrypted);
+}
+
+Uint8List decodeBase64(String base64Str) {
+  return base64Decode(base64Str);
 }

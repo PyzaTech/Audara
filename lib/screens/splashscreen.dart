@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/AesCrypto.dart';
 import '../../utils/WebSocketHandler.dart';
@@ -39,7 +40,9 @@ class _SplashScreenState extends State<SplashScreen> {
       print('Formatted Server URL: $serverUrl');
 
       try {
-        final webSocketHandler = WebSocketHandler(serverUrl, context);
+        final webSocketHandler = Provider.of<WebSocketHandler>(context, listen: false);
+        webSocketHandler.updateServerUrl(serverUrl);
+
 
         StreamSubscription? _AESSubscription;
         _AESSubscription = webSocketHandler.stream.listen(
@@ -61,7 +64,7 @@ class _SplashScreenState extends State<SplashScreen> {
               });
 
               final encrypted = AesCrypto().encryptText(loginData);
-              webSocketHandler.channel.sink.add(encrypted);
+              webSocketHandler.channel?.sink.add(encrypted);
 
             }
           },

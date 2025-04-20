@@ -33,6 +33,10 @@ dependencies:
   web_socket_channel: ^2.3.0
   encrypt: ^5.0.0
   convert: ^3.1.1
+  provider: ^6.1.4
+  audio_session: ^0.1.6
+  flutter_sound: ^9.2.13+1
+  path_provider: ^2.1.5
   flutter:
     sdk: flutter
 

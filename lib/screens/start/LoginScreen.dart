@@ -112,7 +112,7 @@ class LoginScreen extends StatelessWidget {
                       final encrypted = AesCrypto().encryptText(jsonString);
 
                       // Send the encrypted message to the server
-                      webSocketHandler.channel.sink.add(encrypted);
+                      webSocketHandler.channel?.sink.add(encrypted);
 
                       print("Sent encrypted login data: $encrypted");
 

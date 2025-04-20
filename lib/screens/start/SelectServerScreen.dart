@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:audara/main.dart';
+import 'package:audara/utils/AudioPlayer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audara/utils/WebSocketHandler.dart';
 import 'package:audara/screens/start/StartScreen.dart';
@@ -54,11 +57,22 @@ class _SelectServerScreenState extends State<SelectServerScreen> {
 
   Future<WebSocketHandler> _tryConnect(String url) async {
     try {
-      final webSocketHandler = WebSocketHandler(url, context);
-      return webSocketHandler;
-    } on SocketException {
+      WebSocketHandler newHandler = WebSocketHandler(url, context);
+      newHandler.updateServerUrl(url);
+      Provider<WebSocketHandler>(
+        create: (_) => newHandler,
+        child: MyApp(audioPlayerHandler: Provider.of<AudioStreamHandler>(context, listen: false)),
+      );
+      return newHandler;
+    } on SocketException catch (e) {
+      // Handle network-related errors
+      _showError('Failed to connect to the server. Please check your internet connection.');
+      print('SocketException: ${e.message}');
       throw Exception('Failed to connect to the server.');
     } catch (e) {
+      // Handle other types of errors
+      _showError('An unexpected error occurred. Please try again.');
+      print('Error: $e');
       throw Exception('Failed to connect to the server.');
     }
   }
@@ -132,10 +146,8 @@ class _SelectServerScreenState extends State<SelectServerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final double buttonWidth = MediaQuery
-        .of(context)
-        .size
-        .width * 0.8;
+    final double buttonWidth = MediaQuery.of(context).size.width * 0.8;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -149,34 +161,37 @@ class _SelectServerScreenState extends State<SelectServerScreen> {
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Column(
                   children: [
-                    Stack(
-                      children: [
-                        Image.network(
-                          'https://portfolio.pizzalover.dev/assets/img/backgroundy.png',
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: 300,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              height: 300,
-                              color: Colors.grey,
-                              child: const Center(
-                                child: Icon(
-                                  Icons.broken_image,
-                                  color: Colors.white,
-                                  size: 50,
+                    if (!isLandscape) // Show the image only in portrait mode
+                      Stack(
+                        children: [
+                          Image.network(
+                            'https://portfolio.pizzalover.dev/assets/img/backgroundy.png',
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: 300,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                height: 300,
+                                color: Colors.grey,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.broken_image,
+                                    color: Colors.white,
+                                    size: 50,
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
-                        Container(
-                          height: 300,
-                          color: Colors.black.withOpacity(0.5),
-                        ),
-                      ],
-                    ),
-                    // Footer stuff
+                              );
+                            },
+                          ),
+                          Container(
+                            height: 300,
+                            color: Colors.black.withOpacity(0.5),
+                          ),
+                        ],
+                      ),
+                    // Footer and form elements
+                    if(isLandscape)
+                      const SizedBox(height: 32),
                     Column(
                       children: [
                         SvgPicture.asset(
@@ -204,7 +219,6 @@ class _SelectServerScreenState extends State<SelectServerScreen> {
                         const SizedBox(height: 32),
                       ],
                     ),
-                    // Spacer between image and form
                     Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Center(
@@ -285,9 +299,6 @@ class _SelectServerScreenState extends State<SelectServerScreen> {
         ),
       ),
     );
-
-
-
   }
 
     @override

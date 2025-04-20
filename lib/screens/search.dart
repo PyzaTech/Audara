@@ -1,7 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:audara/screens/home.dart';
+import 'package:audara/utils/WebSocketHandler.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
+
+import '../utils/PlayQueue.dart';
+import '../widgets/MediaPlayer.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -79,7 +85,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              onChanged: _searchSongs, // Trigger search on every character input
+              onChanged: _searchSongs,
             ),
             const SizedBox(height: 24),
             Expanded(
@@ -112,7 +118,12 @@ class _SearchScreenState extends State<SearchScreen> {
                       style: const TextStyle(color: Colors.white70),
                     ),
                     onTap: () {
-                      // Handle song selection
+                      final playQueue = Provider.of<PlayQueue>(context, listen: false);
+                      final webSocketHandler = Provider.of<WebSocketHandler>(context, listen: false);
+
+                      print('🎵 Song selected: ${song['title']} by ${song['artist']}');
+                      playQueue.streamSong(webSocketHandler, song, context);
+
                     },
                   );
                 },
@@ -121,37 +132,42 @@ class _SearchScreenState extends State<SearchScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.black,
-        selectedItemColor: Colors.green,
-        unselectedItemColor: Colors.white70,
-        currentIndex: 1, // Set the current index to highlight the Home tab
-        onTap: (index) {
-          if (index == 0) { // Index 1 corresponds to the Search tab
-            Navigator.pushReplacement(
-              context,
-              PageRouteBuilder(
-                pageBuilder: (context, animation, secondaryAnimation) =>
-                    Home(),
-                transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                  return FadeTransition(opacity: animation, child: child);
-                },
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const MediaPlayer(), // Add the MediaPlayer widget here
+          BottomNavigationBar(
+            backgroundColor: Colors.black,
+            selectedItemColor: Colors.green,
+            unselectedItemColor: Colors.white70,
+            currentIndex: 1, // Set the current index to highlight the Search tab
+            onTap: (index) {
+              if (index == 0) {
+                Navigator.pushReplacement(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => const Home(),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                  ),
+                );
+              }
+            },
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home),
+                label: 'Home',
               ),
-            );
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.library_music),
-            label: 'Your Library',
+              BottomNavigationBarItem(
+                icon: Icon(Icons.search),
+                label: 'Search',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.library_music),
+                label: 'Your Library',
+              ),
+            ],
           ),
         ],
       ),
