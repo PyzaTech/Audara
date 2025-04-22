@@ -48,7 +48,6 @@ class AudioStreamHandler with ChangeNotifier {
 
       print('▶️ Playback started');
       notifyListeners();
-      // TODO: Add a 500ms delay before running playQueue.startProgressListener();
       await Future.delayed(const Duration(milliseconds: 500));
       playQueue.startProgressListener();
     } catch (e, stackTrace) {
