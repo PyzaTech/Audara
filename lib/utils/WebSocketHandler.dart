@@ -17,6 +17,9 @@ class WebSocketHandler with ChangeNotifier{
   final BuildContext? context;
   String? serverUrl;
 
+  Timer? get heartbeatTimer => _heartbeatTimer;
+  void get startHeartbeat => _startHeartbeat();
+
   WebSocketHandler(String? serverUrl, this.context) {
     tryConnect();
   }
@@ -28,16 +31,20 @@ class WebSocketHandler with ChangeNotifier{
   }
 
   void _showError(String message) {
-      ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
+    ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 
-  void tryConnect() {
+  void tryConnect() async {
     try {
+      if(serverUrl == null) {
+        print('Server URL is null, cannot connect to WebSocket');
+        return;
+      }
       _channel = WebSocketChannel.connect(Uri.parse(serverUrl!));
     } catch (e) {
       print('Error connecting to WebSocket: $e'); // Debug log
@@ -101,6 +108,10 @@ class WebSocketHandler with ChangeNotifier{
 
   // Start the heartbeat timer
   void _startHeartbeat() {
+    if(AesCrypto().key == null) {
+      print('AES key is null, cannot start heartbeat');
+      return;
+    }
     // Add a wait to ensure the connection is established before starting the heartbeat
     Future.delayed(const Duration(seconds: 2), () {
       print('Heartbeat started');
@@ -120,7 +131,7 @@ class WebSocketHandler with ChangeNotifier{
 
       // Send the encrypted message to the server
       channel?.sink.add(encrypted);
-        });
+    });
   }
 
   // Stop the heartbeat timer

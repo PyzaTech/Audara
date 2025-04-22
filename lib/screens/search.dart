@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../utils/PlayQueue.dart';
 import '../widgets/MediaPlayer.dart';
+import 'SongDetailScreen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -19,6 +20,14 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, String>> _songs = [];
+  Timer? _debounce;
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _searchSongs(query);
+    });
+  }
 
   Future<void> _searchSongs(String query) async {
     if (query.isEmpty) {
@@ -28,18 +37,15 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
-    final response = await http.get(
-      Uri.parse('https://api.deezer.com/search?q=$query'),
-    );
-
+    final response = await http.get(Uri.parse('https://api.deezer.com/search?q=$query'));
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       setState(() {
         _songs = (data['data'] as List?)?.map((item) {
           return {
-            'title': item['title'] as String? ?? 'Unknown Title', // Default title
-            'artist': item['artist']['name'] as String? ?? 'Unknown Artist', // Default artist
-            'image': item['album']['cover_small'] as String? ?? '', // Default to empty string
+            'title': item['title'] as String? ?? 'Unknown Title',
+            'artist': item['artist']['name'] as String? ?? 'Unknown Artist',
+            'image': item['album']['cover_big'] as String? ?? '',
           };
         }).toList() ?? [];
       });
@@ -48,6 +54,13 @@ class _SearchScreenState extends State<SearchScreen> {
         _songs = [];
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -85,7 +98,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              onChanged: _searchSongs,
+              onChanged: _onSearchChanged,
             ),
             const SizedBox(height: 24),
             Expanded(
@@ -135,7 +148,20 @@ class _SearchScreenState extends State<SearchScreen> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const MediaPlayer(), // Add the MediaPlayer widget here
+          GestureDetector(
+            onTap: () {
+              final playQueue = Provider.of<PlayQueue>(context, listen: false);
+              if (playQueue.currentSong != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SongDetailScreen(),
+                  ),
+                );
+              }
+            },
+            child: MediaPlayer(),
+          ),
           BottomNavigationBar(
             backgroundColor: Colors.black,
             selectedItemColor: Colors.green,

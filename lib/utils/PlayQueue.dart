@@ -11,6 +11,8 @@ class PlayQueue with ChangeNotifier {
   final List<Map<String, String>> _queue = [];
   int _currentIndex = -1;
   Map<String, String>? _currentSong;
+  bool loopQueue = false; // Loop queue flag
+  bool loopCurrent = false; // Loop current song flag
 
   final AudioStreamHandler _audioPlayer;
 
@@ -22,12 +24,7 @@ class PlayQueue with ChangeNotifier {
 
   bool get hasNext => _currentIndex < _queue.length - 1;
   bool get hasPrevious => _currentIndex > 0;
-
-  void addToQueue(Map<String, String> song) {
-    _queue.add(song);
-    print('📥 Song added to queue: ${song['title']} by ${song['artist']}');
-    notifyListeners();
-  }
+  List<Map<String, String>> get queue => _queue;
 
   void removeFromQueue(int index) {
     if (index >= 0 && index < _queue.length) {
@@ -52,12 +49,17 @@ class PlayQueue with ChangeNotifier {
       notifyListeners();
       print('🎵 No more songs in the queue.');
     }
+    notifyListeners();
   }
 
   void playPrevious() {
     if (hasPrevious) {
       _currentIndex--;
+      _currentSong = _queue[_currentIndex]; // Update the current song
+      print('🔄 Playing previous song: ${_currentSong?['title']} by ${_currentSong?['artist']}');
       _notifySongChanged();
+    } else {
+      print('🎵 No previous song in the queue.');
     }
   }
 
@@ -91,19 +93,26 @@ class PlayQueue with ChangeNotifier {
   }
 
   void setCurrentSong(Map<String, String> song) async {
+    if (_currentSong == song) return; // Avoid redundant updates
     _currentIndex = _queue.indexOf(song);
     _currentSong = song;
-    print('🎶 Current song set: ${_currentSong?['title']} by ${_currentSong?['artist']}, song url: ${song['url']}');
+    print('🎶 Current song set: ${_currentSong?['title']} by ${_currentSong?['artist']}');
 
     try {
-      // Initialize and play the song
       await _audioPlayer.initializePlayer();
       await _audioPlayer.playFromUrl(song['url']!);
     } catch (e) {
       print('❌ Error playing song: $e');
     }
 
-    notifyListeners(); // Notify listeners after updating the current song
+    notifyListeners(); // Notify only when the song changes
+  }
+
+  void addToQueue(Map<String, String> song) {
+    if (!_queue.contains(song)) {
+      _queue.add(song);
+      notifyListeners(); // Notify only when the queue changes
+    }
   }
 
 
@@ -155,7 +164,9 @@ class PlayQueue with ChangeNotifier {
           };
 
           addToQueue(streamSong);
-          setCurrentSong(streamSong); // Set the current song
+          if(currentSong == null) {
+            setCurrentSong(streamSong); // Set the current song
+          }
 
           print('✅ Song added to PlayQueue and set as current song.');
           _subscription?.cancel();
@@ -167,6 +178,44 @@ class PlayQueue with ChangeNotifier {
         print('Error processing server response: $e');
       }
     });
+  }
+
+  void pause_resume() {
+    if (_audioPlayer.player.isPlaying) {
+      _audioPlayer.player.pausePlayer();
+      print('⏸️ Playback paused');
+    } else {
+      _audioPlayer.player.resumePlayer();
+      print('▶️ Playback resumed');
+    }
+    notifyListeners();
+  }
+
+  void startProgressListener() {
+    print("🕒 Starting progress listener");
+    _audioPlayer.player.onProgress?.listen((event) {
+      print('⏳ Current position: ${event.position.inSeconds} seconds');
+      _audioPlayer.currentPosition = event.position;
+      _audioPlayer.totalDuration = event.duration;
+      notifyListeners();
+    }, onError: (error) {
+      print('❌ Error in onProgress stream: $error');
+    });
+  }
+
+  void toggleLoop() {
+    if(!loopQueue && !loopCurrent) {
+      loopQueue = true;
+      print('Looping the entire queue');
+    } else if(loopQueue && !loopCurrent) {
+      loopCurrent = true;
+      loopQueue = false;
+      print('Looping the current song');
+    } else if(loopCurrent) {
+      loopCurrent = false;
+      print('Looping disabled');
+    }
+    notifyListeners();
   }
 
 }

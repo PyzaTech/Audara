@@ -23,7 +23,7 @@ void main() {
         providers: [
           ChangeNotifierProvider.value(value: playQueue),
           ChangeNotifierProvider.value(value: webSocketHandler),
-          Provider.value(value: audioPlayerHandler), // Provide AudioPlayerHandler
+          ChangeNotifierProvider.value(value: audioPlayerHandler), // Provide AudioPlayerHandler
         ],
         child: MyApp(audioPlayerHandler: audioPlayerHandler),
       ),

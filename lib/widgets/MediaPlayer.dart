@@ -1,17 +1,13 @@
-import 'package:audara/utils/AudioPlayer.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../utils/PlayQueue.dart';
+import '../utils/AudioPlayer.dart';
 
 class MediaPlayer extends StatelessWidget {
-  const MediaPlayer({super.key});
-
   @override
   Widget build(BuildContext context) {
     final playQueue = Provider.of<PlayQueue>(context);
-    final audioPlayerHandler = Provider.of<AudioStreamHandler>(context, listen: false);
-
-    print('🔄 MediaPlayer rebuild. Current song: ${playQueue.currentSong?['title']}');
+    final audioPlayerHandler = Provider.of<AudioStreamHandler>(context);
 
     if (playQueue.currentSong == null) {
       return const SizedBox.shrink();
@@ -19,6 +15,7 @@ class MediaPlayer extends StatelessWidget {
 
     final currentSong = playQueue.currentSong!;
 
+    print(currentSong['image']);
     return Container(
       color: Colors.grey[900],
       padding: const EdgeInsets.all(8.0),
@@ -52,20 +49,20 @@ class MediaPlayer extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.skip_previous, color: Colors.white),
-            onPressed: playQueue.hasPrevious ? playQueue.playPrevious : null,
+            onPressed: playQueue.playPrevious,
           ),
           IconButton(
-            icon: const Icon(Icons.play_arrow, color: Colors.white),
+            icon: Icon(
+              audioPlayerHandler.player.isPlaying ? Icons.pause : Icons.play_arrow,
+              color: Colors.white,
+            ),
             onPressed: () {
-              audioPlayerHandler.pause_resume();
+              playQueue.pause_resume();
             },
           ),
           IconButton(
             icon: const Icon(Icons.skip_next, color: Colors.white),
-            onPressed: () {
-              print('🔄 Next song button pressed');
-              playQueue.playNext();
-            }
+            onPressed: playQueue.playNext,
           ),
         ],
       ),

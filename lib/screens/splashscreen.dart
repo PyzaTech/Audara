@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:audara/screens/start/StartScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,47 +29,67 @@ class _SplashScreenState extends State<SplashScreen> {
     final username = prefs.getString('username');
     final password = prefs.getString('password');
     String? serverUrl = prefs.getString('server_url');
+    WebSocketHandler webSocketHandler;
 
     print('Username: $username, Password: $password, Server URL: $serverUrl');
 
-    if (username != null && password != null && serverUrl != null) {
-      // Ensure the server URL has a valid WebSocket scheme
-      if (!serverUrl.startsWith('ws://') && !serverUrl.startsWith('wss://')) {
-        serverUrl = 'ws://$serverUrl'; // Default to ws:// if no scheme is provided
-      }
+    if(serverUrl == null) {
+      // If no server URL is found, redirect to SelectServerScreen
+      print('No server URL found, redirecting to SelectServerScreen');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => SelectServerScreen()),
+      );
+      return;
+    }
+
+    // Ensure the server URL has a valid WebSocket scheme
+    if (!serverUrl.startsWith('ws://') && !serverUrl.startsWith('wss://')) {
+      serverUrl = 'ws://$serverUrl'; // Default to ws:// if no scheme is provided
+    }
+
+
+    webSocketHandler = Provider.of<WebSocketHandler>(context, listen: false);
+    print(serverUrl);
+    webSocketHandler.updateServerUrl(serverUrl);
+
+
+    StreamSubscription? _AESSubscription;
+    _AESSubscription = webSocketHandler.stream.listen(
+          (message) async {
+
+        final jsonResponse = jsonDecode(message);
+
+        print('AES Subscription Message: $jsonResponse');
+        if (jsonResponse['type'] == 'session-key') {
+          final aesKey = jsonResponse['key'];
+          AesCrypto().initFromBase64(aesKey);
+          await AesCrypto().saveToPrefs();
+          print('✅ AES session key saved. $aesKey');
+          _AESSubscription?.cancel();
+
+          final loginData = jsonEncode({
+            "action": "login",
+            "username": username,
+            "password": password,
+          });
+
+          final encrypted = AesCrypto().encryptText(loginData);
+          webSocketHandler.channel?.sink.add(encrypted);
+          if(webSocketHandler.heartbeatTimer == null) {
+            webSocketHandler.startHeartbeat;
+          }
+
+        }
+      },
+    );
+
+    if (username != null && password != null) {
+      print('Username and password found, attempting to connect to WebSocket');
 
       print('Formatted Server URL: $serverUrl');
 
       try {
-        final webSocketHandler = Provider.of<WebSocketHandler>(context, listen: false);
-        webSocketHandler.updateServerUrl(serverUrl);
-
-
-        StreamSubscription? _AESSubscription;
-        _AESSubscription = webSocketHandler.stream.listen(
-          (message) async {
-
-            final jsonResponse = jsonDecode(message);
-
-            if (jsonResponse['type'] == 'session-key') {
-              final aesKey = jsonResponse['key'];
-              AesCrypto().initFromBase64(aesKey);
-              await AesCrypto().saveToPrefs();
-              print('✅ AES session key saved. $aesKey');
-              _AESSubscription?.cancel();
-
-              final loginData = jsonEncode({
-                "action": "login",
-                "username": username,
-                "password": password,
-              });
-
-              final encrypted = AesCrypto().encryptText(loginData);
-              webSocketHandler.channel?.sink.add(encrypted);
-
-            }
-          },
-        );
 
         StreamSubscription? _subscription;
         _subscription = webSocketHandler.stream.listen((message) async {
@@ -77,13 +98,13 @@ class _SplashScreenState extends State<SplashScreen> {
             if(json['type'] == 'session-key') {
               return;
             }
-            }
+          }
           final decryptedMessage = AesCrypto().decryptText(message);
           final jsonResponse = jsonDecode(decryptedMessage);
 
           print('Server Response: $jsonResponse');
 
-           if (jsonResponse['success'] == false) {
+          if (jsonResponse['success'] == false) {
             print('Login failed, redirecting to LoginScreen');
             _subscription?.cancel();
             Navigator.pushReplacement(
@@ -91,14 +112,14 @@ class _SplashScreenState extends State<SplashScreen> {
               MaterialPageRoute(builder: (context) => LoginScreen(webSocketHandler: webSocketHandler)),
             );
           } else {
-             _subscription?.cancel();
-             Navigator.pushReplacement(
-                 context,
-                  MaterialPageRoute(
-                      builder: (context) => Home(),
-                  ),
-             );
-           }
+            _subscription?.cancel();
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Home(),
+              ),
+            );
+          }
         });
       } catch (e) {
         print('Error during WebSocket connection or login: $e');
@@ -108,10 +129,10 @@ class _SplashScreenState extends State<SplashScreen> {
         );
       }
     } else {
-      print('Missing login details, redirecting to SelectServerScreen');
+      print('Missing login info, but found Server URL, redirecting to Start Screen.');
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => SelectServerScreen()),
+        MaterialPageRoute(builder: (context) => StartScreen(serverUrl: prefs.getString('server_url')!, webSocketHandler: webSocketHandler)),
       );
     }
   }
